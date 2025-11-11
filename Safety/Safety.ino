@@ -3,6 +3,7 @@
 #include "Accelerometer.h"
 #include "RFIDModule.h"
 #include "config.h"
+#include <Wire.h>
 
 Keypad keypad;
 ServoGate gate;
@@ -18,6 +19,10 @@ bool rfidVerified = false;
 
 void setup() {
   Serial.begin(9600);
+  
+  Wire.begin();
+  Wire.setClock(100000);
+  
   keypad.begin();
   gate.begin();
   accel.begin();
@@ -25,6 +30,9 @@ void setup() {
 
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW);
+  
+  pinMode(TAMPER_ALERT_PIN, OUTPUT);
+  digitalWrite(TAMPER_ALERT_PIN, LOW);
 
   Serial.println(F("🔰 System Initialized"));
   Serial.println(F("Tap RFID card to begin..."));
@@ -57,16 +65,25 @@ void buzzerTamperAlarm() {
   noTone(BUZZER_PIN);
 }
 
+void sendTamperToESP32() {
+  Wire.beginTransmission(0x08);
+  Wire.write(0x01);
+  Wire.endTransmission();
+}
+
 void loop() {
   // 🛡️ Tamper check — always active
   if (accel.isTampered()) {
     Serial.println(F("🚨 Tampering detected! Triggering alarm!"));
+    digitalWrite(TAMPER_ALERT_PIN, HIGH);
+    sendTamperToESP32();
     buzzerTamperAlarm();
     delay(500);
+    digitalWrite(TAMPER_ALERT_PIN, LOW);
     return;
   }
 
-  // 🆔 RFID authentication first
+  // RFID authentication first
   if (!rfidVerified) {
     if (rfid.pollCard()) {  // new card detected
       Serial.print(F("UID tag : "));
@@ -85,7 +102,7 @@ void loop() {
     return;
   }
 
-  // 🔢 Keypad entry after valid RFID
+  // Keypad entry after valid RFID
   char key = keypad.getKey();
 
   if (key) {
@@ -95,15 +112,15 @@ void loop() {
     if (key == '#') {
       entered[index] = '\0';
       if (keypad.checkPasscode()) {
-        Serial.println(F("✅ Access Granted"));
+        Serial.println(F("Access Granted"));
         buzzerAccessGranted();
         gate.openGate();
         delay(2000);
         gate.closeGate();
         rfidVerified = false; // reset for next use
-        Serial.println(F("🔒 System locked. Tap RFID to start again."));
+        Serial.println(F("System locked. Tap RFID to start again."));
       } else {
-        Serial.println(F("❌ Access Denied"));
+        Serial.println(F("Access Denied"));
         buzzerAccessDenied();
       }
       index = 0;

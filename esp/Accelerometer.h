@@ -14,15 +14,15 @@ public:
         Wire.begin(SDA_PIN, SCL_PIN);
         delay(100);
 
-        Serial.println(F("🔍 Scanning for ADXL345..."));
+        Serial.println(F(" Scanning for ADXL345..."));
         Wire.beginTransmission(ADXL345_ADDRESS);
         uint8_t error = Wire.endTransmission();
 
         if (error == 0) {
-            Serial.print(F("✅ ADXL345 found at I2C address: 0x"));
+            Serial.print(F(" ADXL345 found at I2C address: 0x"));
             Serial.println(ADXL345_ADDRESS, HEX);
         } else {
-            Serial.print(F("❌ ADXL345 not detected at 0x"));
+            Serial.print(F(" ADXL345 not detected at 0x"));
             Serial.println(ADXL345_ADDRESS, HEX);
             Serial.println(F("Check wiring (VCC, GND, SDA, SCL, CS HIGH, SDO GND)."));
         }

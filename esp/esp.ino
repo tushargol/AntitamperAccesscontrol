@@ -1,12 +1,11 @@
-#include <Wire.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
-#include "Accelerometer.h"
+#include <Wire.h>
 #include "espconfig.h"
 
+#define ADXL345_ADDRESS 0x53
 
 WiFiClientSecure client;
-Accelerometer accel;
 
 // ---------------- Wi-Fi + Telegram ----------------
 void connectToWiFi() {
@@ -19,7 +18,7 @@ void connectToWiFi() {
     delay(500);
     Serial.print(".");
     if (++retries > 40) {
-      Serial.println("\n⚠️ Wi-Fi reconnecting...");
+      Serial.println("\nWi-Fi reconnecting...");
       WiFi.disconnect(true);
       delay(2000);
       WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -27,7 +26,7 @@ void connectToWiFi() {
     }
   }
 
-  Serial.println("\n✅ Wi-Fi connected!");
+  Serial.println("\n Wi-Fi connected!");
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 }
@@ -37,7 +36,7 @@ bool sendTelegramMessage(const String &text) {
 
   client.setInsecure();
   if (!client.connect("api.telegram.org", 443)) {
-    Serial.println("❌ Telegram connection failed!");
+    Serial.println(" Telegram connection failed!");
     return false;
   }
 
@@ -55,32 +54,51 @@ bool sendTelegramMessage(const String &text) {
   client.print(request);
   delay(400);
 
-  Serial.println("📤 Telegram alert sent!");
+  Serial.println(" Telegram alert sent!");
   return true;
 }
 
-// ---------------- SETUP ----------------
+void initAccelerometer() {
+  Wire.beginTransmission(ADXL345_ADDRESS);
+  Wire.write(0x2D);
+  Wire.write(0x08);
+  Wire.endTransmission();
+}
+
+bool checkTamper() {
+  Wire.beginTransmission(ADXL345_ADDRESS);
+  Wire.write(0x32);
+  Wire.endTransmission();
+  Wire.requestFrom(ADXL345_ADDRESS, 6);
+  
+  if (Wire.available() >= 6) {
+    int16_t x = Wire.read() | (Wire.read() << 8);
+    int16_t y = Wire.read() | (Wire.read() << 8);
+    int16_t z = Wire.read() | (Wire.read() << 8);
+    
+    float magnitude = sqrt(x*x + y*y + z*z);
+    return magnitude > 400;
+  }
+  return false;
+}
+
 void setup() {
   Serial.begin(115200);
   delay(1000);
 
+  Wire.begin(21, 22);
+  initAccelerometer();
   connectToWiFi();
-  accel.begin();
 
-  Serial.println("✅ Tamper detection system active.");
-  sendTelegramMessage("🟢 ESP32 Tamper Monitor online.");
+  Serial.println("ESP32 Tamper Monitor online.");
+  sendTelegramMessage("ESP32 Tamper Monitor online.");
 }
 
-// ---------------- LOOP ----------------
 void loop() {
-  // Check accelerometer for tampering
-  if (accel.isTampered(0.3)) {
+  if (checkTamper()) {
     Serial.println("🚨 Tampering detected!");
     sendTelegramMessage("🚨 ALERT: Tampering detected at device!");
-    delay(5000);  // avoid flooding Telegram
-  } else {
-    accel.printAcceleration(false);  // optional live feed
+    delay(5000);
   }
-
-  delay(500);  // sampling interval
+  delay(500);
 }
