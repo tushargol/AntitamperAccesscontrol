@@ -12,6 +12,8 @@ private:
 public:
     inline void begin() {
         Wire.begin(SDA_PIN, SCL_PIN);
+        Wire.setClock(100000);  // Set I2C to 100kHz for stability
+        Wire.setTimeOut(500);   // 500ms timeout
         delay(100);
 
         Serial.println(F(" Scanning for ADXL345..."));
@@ -21,6 +23,7 @@ public:
         if (error == 0) {
             Serial.print(F(" ADXL345 found at I2C address: 0x"));
             Serial.println(ADXL345_ADDRESS, HEX);
+            Serial.println(F(" I2C Clock: 100kHz"));
         } else {
             Serial.print(F(" ADXL345 not detected at 0x"));
             Serial.println(ADXL345_ADDRESS, HEX);
@@ -38,15 +41,25 @@ public:
     }
 
     inline void readRaw(int16_t &x, int16_t &y, int16_t &z) {
+        x = y = z = 0;  // Initialize to zero
+        
         Wire.beginTransmission(ADXL345_ADDRESS);
         Wire.write(0x32);  // Data start register
-        Wire.endTransmission(false);
-        Wire.requestFrom((uint8_t)ADXL345_ADDRESS, (uint8_t)6);
-
-        if (Wire.available() == 6) {
+        uint8_t error = Wire.endTransmission(false);
+        
+        if (error != 0) {
+            Serial.printf("I2C write error: %d\n", error);
+            return;
+        }
+        
+        uint8_t bytesRead = Wire.requestFrom((uint8_t)ADXL345_ADDRESS, (uint8_t)6);
+        
+        if (bytesRead == 6 && Wire.available() == 6) {
             x = Wire.read() | (Wire.read() << 8);
             y = Wire.read() | (Wire.read() << 8);
             z = Wire.read() | (Wire.read() << 8);
+        } else {
+            Serial.printf("I2C read failed: expected 6 bytes, got %d\n", bytesRead);
         }
     }
 
@@ -78,6 +91,11 @@ public:
     inline bool isTampered(float threshold = 0.3) {
         float xg, yg, zg;
         readAcceleration(xg, yg, zg);
+        
+        // Check for invalid readings (I2C failure)
+        if (xg == 0 && yg == 0 && zg == 0) {
+            return false;  // Skip this check if read failed
+        }
 
         float dx = fabs(xg - baseX);
         float dy = fabs(yg - baseY);
@@ -85,6 +103,7 @@ public:
 
         if (dx > threshold || dy > threshold || dz > threshold) {
             Serial.println(F("⚠️ Tampering detected!"));
+            Serial.printf("Delta: X=%.3f Y=%.3f Z=%.3f\n", dx, dy, dz);
             return true;
         }
         return false;
