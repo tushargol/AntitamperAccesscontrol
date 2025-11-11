@@ -1,7 +1,7 @@
 #ifndef RFIDMODULE_H
 #define RFIDMODULE_H
 
-#include "Config.h"
+#include "config.h"
 #include <SPI.h>
 #include <MFRC522.h>
 

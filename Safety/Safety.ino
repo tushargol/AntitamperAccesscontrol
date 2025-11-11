@@ -66,8 +66,8 @@ void buzzerTamperAlarm() {
 }
 
 void sendTamperToESP32() {
-  Wire.beginTransmission(0x08);
-  Wire.write(0x01);
+  Wire.beginTransmission(0x08);  // ESP32 I2C slave address
+  Wire.write(0x01);              // Tamper signal
   Wire.endTransmission();
 }
 
@@ -76,7 +76,7 @@ void loop() {
   if (accel.isTampered()) {
     Serial.println(F("🚨 Tampering detected! Triggering alarm!"));
     digitalWrite(TAMPER_ALERT_PIN, HIGH);
-    sendTamperToESP32();
+    sendTamperToESP32();  // Send signal to ESP32 via I2C
     buzzerTamperAlarm();
     delay(500);
     digitalWrite(TAMPER_ALERT_PIN, LOW);
@@ -110,25 +110,29 @@ void loop() {
     Serial.println(key);
 
     if (key == '#') {
+      // Null terminate and check if we have 4 digits
       entered[index] = '\0';
-      if (keypad.checkPasscode()) {
-        Serial.println(F("Access Granted"));
+      
+      if (index == 4 && strcmp(entered, PASSCODE) == 0) {
+        Serial.println(F("✅ Access Granted"));
         buzzerAccessGranted();
         gate.openGate();
         delay(2000);
         gate.closeGate();
         rfidVerified = false; // reset for next use
+        index = 0;
         Serial.println(F("System locked. Tap RFID to start again."));
       } else {
-        Serial.println(F("Access Denied"));
+        Serial.println(F("❌ Access Denied - Wrong passcode or incomplete entry"));
         buzzerAccessDenied();
+        index = 0;
       }
-      index = 0;
     } else if (key == '*') {
       index = 0;
       Serial.println(F("Input cleared"));
     } else if (index < 4) {
       entered[index++] = key;
+      Serial.print(F("* ")); // Show input feedback
     }
   }
 
