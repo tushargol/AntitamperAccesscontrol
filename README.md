@@ -80,7 +80,3 @@ Arduino-based security system with RFID authentication, keypad entry, and tamper
 - **Double beep**: Access granted
 - **Triple beep**: Access denied
 - **Rapid beeps**: Tamper alarm
-
-## License
-
-MIT License - See LICENSE file for details
